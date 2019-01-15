@@ -242,6 +242,7 @@ def checkheater():
     except Exception as e:
         logger.debug("Could not get heater status: "+str(e))
 
+
 def fixvpd():
     global vpd, when, vpdset, nightvpdset
 #day
@@ -260,10 +261,21 @@ def fixvpd():
             if "on" in humidifierstatus:
                 logger.debug("VPD is below target, turning humidifier off.")
                 humidifieroff()
+            if "off" in fanstatus:
+                if humidity >= nighthumhigh:
+                    logger.debug("Humidity is "+str(humidity)+", turning fan on.")
+                    fanon()
+
         elif vpd > nightvpdset:
             if "off" in humidifierstatus:
                 logger.debug("VPD is above target, turning humidifier on.")
                 humidifieron()
+            if "on" in fanstatus:
+                if humidity <= nighthumhigh:
+                    logger.debug("Humidity is "+str(humidity)+", turning fan off.")
+                    fanoff()
+
+            
 
 
 def fixtemp():
