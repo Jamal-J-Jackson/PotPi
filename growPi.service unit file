@@ -1,0 +1,15 @@
+[Unit]
+Description=growPi
+After=multi-user.target
+
+[Service]
+Type=idle
+
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/Desktop/read1sec.py
+
+Restart=always
+RestartSec=0
+WorkingDirectory=/home/pi/Desktop
+[Install]
+WantedBy=multi-user.target
