@@ -37,11 +37,11 @@ except Exception as e:
     logger.debug("Could not get SHT31-D Temp/Humidity sensor: "+str(e))
 
 # Configure InfluxDB connection variables
-host = "10.0.0.13" # My Ubuntu NUC
+host = "localhost" # My Ubuntu NUC
 port = 8086 # default port
-user = "rpi-3" # the user/password created for the pi, with write access
-password = "data@LOG" 
-dbname = "sensor_data" # the database we created earlier
+user = "" # the user/password created for the pi, with write access
+password = "" 
+dbname = "_internal" # the database we created earlier
 # Create the InfluxDB client object
 client = InfluxDBClient(host, port, user, password, dbname)
 loopcount = 0
@@ -85,9 +85,9 @@ def shipEnviroData(grafTemp, grafHum, grafvpd):
             },
             "time": iso,
             "fields": {
-                "temperature" : grafTemp,
-                "humidity": grafHum,
-                "vpd": grafvpd
+                "1" : grafTemp,
+                "2": grafHum,
+                "3": grafvpd
             }
         }
     ]
@@ -98,7 +98,7 @@ def shipEnviroData(grafTemp, grafHum, grafvpd):
 
 #Read config
 def readconfig():
-    global lastpictime, nighttemphigh, nighttemplow, nighthumhigh, nighthumlow, temphigh, templow, humhigh, humlow, coldprotecttemp, sleeptime, vpdset, nightvpdset
+    global lastpictime, nighttemphigh, nighttemplow, nighthumhigh, nighthumlow, temphigh, templow, humhigh, humlow, coldprotecttemp, sleeptime, vpdset, nightvpdset,units
     try:
         config = configparser.ConfigParser()
         config.read('config.ini')
@@ -120,6 +120,8 @@ def readconfig():
         fanoffcount = Decimal(config['DEFAULT']['FANOFFCOUNT'])
         vpdset = Decimal(config['DEFAULT']['VPD'])
         nightvpdset = Decimal(config['DEFAULT']['NIGHTVPD'])
+        units = config['DEFAULT']['UNITS']
+        
     except Exception as e:
         logger.debug("Could not read configuration: "+str(e))
         exit()
@@ -212,6 +214,29 @@ def gettemp():
         return round(Decimal(temp),2)
     except Exception as e:
         logger.debug("Could not get temperature: "+str(e))
+
+def gettempf():
+   #Get temp in freedom units
+   try:
+        temp = round(sensor.temperature*1.8+32,1)
+        return round(Decimal(temp),2)
+   except Exception as e:
+        logger.debug("Could not calculate freedom units: " +str(e))
+
+def tempunit():
+    global units
+
+  #Determine what unit to use
+    if units == 'F':
+      try:
+        temp = round(sensor.temperature*1.8+32,1)
+        return round(Decimal(temp),2)
+      except Exception as e:
+        logger.debug("Could not calculate freedom units: " +str(e))
+    else:
+        temp = round(sensor.temperature,1)
+        return round(Decimal(temp),2)
+
 
 def gethum():
     #Get current humidity
@@ -443,18 +468,20 @@ while True:
             logger.debug("Day time detected.")
         readconfig()
         temp = gettemp()
+        tempf = gettempf()
+        tempu = tempunit()
         humidity = gethum()
-        fanstatus = checkfan()
-        humidifierstatus = checkhumidifier()
-        heaterstatus = checkheater()
+        #fanstatus = checkfan()
+        #humidifierstatus = checkhumidifier()
+        #heaterstatus = checkheater()
         logger.debug("Temperature: "+str(temp))
         logger.debug("Humidity: "+str(humidity))
         calcVPD()
-        shipEnviroData(str(temp),str(humidity),str(vpd))
-        fixtemp()
-        fixvpd()
+        shipEnviroData(int(tempu),int(humidity),int(vpd))
+        #fixtemp()
+        #fixvpd()
         #fixhum()
-        takepic()
+       #takepic()
         loopcount += 1
         time.sleep(int(sleeptime))
     except Exception as e:
