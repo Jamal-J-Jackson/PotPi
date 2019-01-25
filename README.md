@@ -1,10 +1,15 @@
 I am using this only as a monitor for now. If you want to use with Wemo switches uncomment these values near the bottom of the script:
 
 fanstatus = checkfan()
+
 humidifierstatus = checkhumidifier()
+
 heaterstatus = checkheater()
+
 fixtemp()
+
 fixvpd()
+
 fixhum()
 
 
