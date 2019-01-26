@@ -85,9 +85,9 @@ def shipEnviroData(grafTemp, grafHum, grafvpd):
             },
             "time": iso,
             "fields": {
-                "1" : grafTemp,
-                "2": grafHum,
-                "3": grafvpd
+                "1.01" : grafTemp,
+                "2.01": grafHum,
+                "3.01": grafvpd
             }
         }
     ]
@@ -477,7 +477,8 @@ while True:
         logger.debug("Temperature: "+str(temp))
         logger.debug("Humidity: "+str(humidity))
         calcVPD()
-        shipEnviroData(int(tempu),int(humidity),int(vpd))
+        shipEnviroData(float(tempu),float(humidity),float(vpd))
+        logger.debug("VPD INT: "+str(vpd))
         #fixtemp()
         #fixvpd()
         #fixhum()
