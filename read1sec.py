@@ -14,6 +14,7 @@ import sys
 import math
 import os
 from influxdb import InfluxDBClient
+import pytz
 
 #global loopcount, humidifierstatusm heaterstatus, fanstatus, templow, temphigh, humlow, humhigh, heateroncycles, heateroffcycles, fanoncycles, fanoffcycles, humidifieroncycles humidifieroffcycles, lastpictime, i2c, sensor, logger, handler, formatter, coldprotecttemp, coldprotecttriggered, client
 
@@ -192,7 +193,7 @@ def humidifieroff():
 def heateron():
     global heateroncycles
     try:
-        check_output("python /usr/local/bin/wemo switch 'heater bud 1' on",shell=True)
+        check_output("python /usr/local/bin/wemo switch 'heater' on",shell=True)
         heateroncycles += 1
         logger.debug("Heater turned on. Count: "+str(heateroncycles))
     except Exception as e:
@@ -201,7 +202,7 @@ def heateron():
 def heateroff():
     global heateroffcycles
     try:
-        check_output("python /usr/local/bin/wemo switch 'heater bud 1' off",shell=True)
+        check_output("python /usr/local/bin/wemo switch 'heater' off",shell=True)
         heateroffcycles += 1
         logger.debug("Heater turned off. Count: "+str(heateroffcycles))
     except Exception as e:
@@ -262,7 +263,7 @@ def checkhumidifier():
 
 def checkheater():
     try:
-        check = check_output("python /usr/local/bin/wemo -v switch 'heater bud 1' status",shell=True)
+        check = check_output("python /usr/local/bin/wemo -v switch 'heater' status",shell=True)
         return str(check)
     except Exception as e:
         logger.debug("Could not get heater status: "+str(e))
@@ -436,16 +437,28 @@ def checktime(starthour, startmin, stophour, stopmin):
     stop = stp.hour * 60 + stp.minute
     if n.hour >= str.hour:
         if n.hour < stp.hour:
-            return False #night
-    return True
+            return True #night
+    return False
     # handle midnight by adding 24 hours to stop time and now time
     #if stop < start:
        # stop += 1440
       #  now += 1440 
     #see if we are in the range
   #  if start <= now > stop:
-      #  return True
-  #  return False
+      #  return False
+  #  return True
+
+def arelightson(tz='US/Central'):
+  tz = pytz.timezone(tz)
+  time_now = dt.datetime.now(tz).time()
+  onTime = dt.time(5, 30, tzinfo=tz)
+  offTime = dt.time(23, 59, tzinfo=tz)
+
+  if time_now >= onTime and time_now <= offTime:
+
+     return True
+    
+  return False
 
 def pilightsoff():
     try:
@@ -461,27 +474,27 @@ pilightsoff()
 while True:
     try:
         logger.debug("\r")
-        when = checktime(starthr,startmin,stophr,stopmin)
+        when = arelightson(tz='US/Central')
         if when == False:
-            logger.debug("Night time detected.")
+            logger.debug("Lights Off Detected.")
         elif when == True:
-            logger.debug("Day time detected.")
+            logger.debug("Lights On Detected.")
         readconfig()
         temp = gettemp()
         tempf = gettempf()
         tempu = tempunit()
         humidity = gethum()
-        #fanstatus = checkfan()
-        #humidifierstatus = checkhumidifier()
-        #heaterstatus = checkheater()
+        fanstatus = checkfan()
+        humidifierstatus = checkhumidifier()
+        heaterstatus = checkheater()
         logger.debug("Temperature: "+str(temp))
         logger.debug("Humidity: "+str(humidity))
         calcVPD()
         shipEnviroData(float(tempu),float(humidity),float(vpd))
         logger.debug("VPD INT: "+str(vpd))
-        #fixtemp()
-        #fixvpd()
-        #fixhum()
+        fixtemp()
+        fixvpd()
+        fixhum()
        #takepic()
         loopcount += 1
         time.sleep(int(sleeptime))
