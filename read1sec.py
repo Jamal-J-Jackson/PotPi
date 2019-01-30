@@ -14,7 +14,6 @@ import sys
 import math
 import os
 from influxdb import InfluxDBClient
-import pytz
 
 #global loopcount, humidifierstatusm heaterstatus, fanstatus, templow, temphigh, humlow, humhigh, heateroncycles, heateroffcycles, fanoncycles, fanoffcycles, humidifieroncycles humidifieroffcycles, lastpictime, i2c, sensor, logger, handler, formatter, coldprotecttemp, coldprotecttriggered, client
 
@@ -56,13 +55,11 @@ humidifierstatus = "not set"
 fanstatus = "not set"
 heaterstatus = "not set" 
 coldprotecttriggered = 0    
-starthr = 8 # before midnight
+starthr = 8 # must be before stop hr, same day
 startmin = 1
-stophr = 16 # after midnight
+stophr = 16 # must be after start hr, same day
 stopmin = 1
 piccount = 0
-#Initialize last picture time to one hour before the script started, so it always takes a picture off the start
-#lastpictime = dt.datetime.now() - dt.timedelta(hours=1)
 lastpictime = dt.datetime.now()
 picfoldername = dt.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 vpdset = 9.0 #set default value
@@ -74,7 +71,7 @@ def makepicdir(folder):
     except Exception as e:
         logger.debug("Could not create picture folder: "+str(e))
 
-def shipEnviroData(grafTemp, grafHum, grafvpd):
+def shipEnviroData(grafTemp, grafHum, grafvpd, soil0, soil1, soil2, soil3):
     global sensortype
     iso = time.ctime()
     # Create the JSON data structure
@@ -88,7 +85,11 @@ def shipEnviroData(grafTemp, grafHum, grafvpd):
             "fields": {
                 "1.01" : grafTemp,
                 "2.01": grafHum,
-                "3.01": grafvpd
+                "3.01": grafvpd,
+                "4.01": soil0,
+                "5.01": soil1,
+                "6.01": soil2,
+                "7.01": soil3
             }
         }
     ]
@@ -234,7 +235,7 @@ def tempunit():
         return round(Decimal(temp),2)
       except Exception as e:
         logger.debug("Could not calculate freedom units: " +str(e))
-    else:
+    elif units == 'C':
         temp = round(sensor.temperature,1)
         return round(Decimal(temp),2)
 
@@ -422,43 +423,15 @@ def fixhum():
                 humidifieron()
             elif "on" in humidifierstatus:
                 logger.debug("Humidifier is on already.")
-
+                
+#only works if start and stop are same day
 def checktime(starthour, startmin, stophour, stopmin):
-    # Set the now time to an integer that is hours * 60 + minutes
     n = dt.datetime.now()
-    now = n.hour * 60 + n.minute 
-     
-    # Set the start time to an integer that is hours * 60 + minutes
     str = dt.time(starthour, startmin)
-    start = str.hour * 60 + str.minute 
-     
-    # Set the stop time to an integer that is hours * 60 + minutes
     stp = dt.time(stophour, stopmin)
-    stop = stp.hour * 60 + stp.minute
-    if n.hour >= str.hour:
-        if n.hour < stp.hour:
-            return True #night
-    return False
-    # handle midnight by adding 24 hours to stop time and now time
-    #if stop < start:
-       # stop += 1440
-      #  now += 1440 
-    #see if we are in the range
-  #  if start <= now > stop:
-      #  return False
-  #  return True
-
-def arelightson(tz='US/Central'):
-  tz = pytz.timezone(tz)
-  time_now = dt.datetime.now(tz).time()
-  onTime = dt.time(5, 30, tzinfo=tz)
-  offTime = dt.time(23, 59, tzinfo=tz)
-
-  if time_now >= onTime and time_now <= offTime:
-
-     return True
-    
-  return False
+    if n.hour >= str.hour and n.hour < stp.hour:
+            return True #Lights On
+    return False #Lights Off
 
 def pilightsoff():
     try:
@@ -467,6 +440,13 @@ def pilightsoff():
     except Exception as e:
         logger.debug("Cannot disable Pi LEDs: "+str(e))
 
+def getsoilinfo(i):
+    try:
+        ssm = getsoilmoisture(i)
+        sst = getsoiltemp(i) 
+        logger.debug("Soil "+str(i)+" Moisture: "+str(ssm)+" Temp: "+str(round(Decimal(sst),2)))
+    except Exception as e:
+        logger.debug("Could not read soil moisture/temp sensor "+str(i)+": "+str(e))
 
 makepicdir(picfoldername)
 pilightsoff()
@@ -474,11 +454,27 @@ pilightsoff()
 while True:
     try:
         logger.debug("\r")
-        when = arelightson(tz='US/Central')
+        when = checktime(starthr,startmin,stophr,stopmin)
         if when == False:
             logger.debug("Lights Off Detected.")
         elif when == True:
             logger.debug("Lights On Detected.")
+        getsoilinfo(0)
+        getsoilinfo(1)
+        getsoilinfo(2)
+        getsoilinfo(3)
+        ssm0 = getsoilmoisture(0)
+        ssm1 = getsoilmoisture(1)
+        ssm2 = getsoilmoisture(2)
+        ssm3 = getsoilmoisture(3)
+        if ssm0 > 2000:
+            ssm0=0
+        if ssm1 > 2000:
+            ssm1=0
+        if ssm2 > 2000:
+            ssm2=0
+        if ssm3 > 2000:
+            ssm3=0
         readconfig()
         temp = gettemp()
         tempf = gettempf()
@@ -490,8 +486,7 @@ while True:
         logger.debug("Temperature: "+str(temp))
         logger.debug("Humidity: "+str(humidity))
         calcVPD()
-        shipEnviroData(float(tempu),float(humidity),float(vpd))
-        logger.debug("VPD INT: "+str(vpd))
+        shipEnviroData(float(temp),float(humidity),float(vpd),float(ssm0),float(ssm1), float(ssm2), float(ssm3))
         fixtemp()
         fixvpd()
         fixhum()
