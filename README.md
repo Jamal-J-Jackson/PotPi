@@ -1,19 +1,3 @@
-I am using this only as a monitor for now. If you want to use with Wemo switches uncomment these values near the bottom of the script:
-
-fanstatus = checkfan()
-
-humidifierstatus = checkhumidifier()
-
-heaterstatus = checkheater()
-
-fixtemp()
-
-fixvpd()
-
-fixhum()
-
-
-
 JustinCredible:
 # PotPi
 Software to control a grow cabinet
@@ -48,7 +32,16 @@ sudo pip3 install adafruit-circuitpython-sht31d
 
 sudo pip3 install influxdb
 
-
 You'll need to edit your influxdb server/username/password in the script
 
 More instructions to come... you can piece it together until then
+
+To use this system only to monitor your grow, comment out the following lines at the bottom of the script:
+
+fanstatus = checkfan()
+humidifierstatus = checkhumidifier()
+heaterstatus = checkheater()
+fixtemp()
+fixvpd()
+fixhum()
+
