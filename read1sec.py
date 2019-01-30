@@ -1,10 +1,9 @@
 import time
 import board
 import busio
-#Add Temperature/Humidity sensor driver
 import adafruit_sht31d
+from adafruit_seesaw.seesaw import Seesaw
 from decimal import *
-#Add ability to run external commands and retrieve output
 from subprocess import check_output
 import datetime as dt
 import urllib.request
@@ -25,16 +24,25 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 logger.debug("Script started.")
-# Create library object using our Bus I2C port
+ss = []
+# set up i2c connections
 try:
+#connect i2c bus 1
     i2c = busio.I2C(board.SCL, board.SDA)
+#connect i2c bus 3
+    i2c3 = busio.I2C(board.D17, board.D4)
 except Exception as e:
     logger.debug("Could not get i2c bus: "+str(e))
-#Connect to sensor
+#Connect to sensors
 try:
     sensor = adafruit_sht31d.SHT31D(i2c)
+    ss.insert(0, Seesaw(i2c, addr=0x36))
+    ss.insert(1, Seesaw(i2c, addr=0x37))
+    ss.insert(2, Seesaw(i2c3, addr=0x36))
+    ss.insert(3, Seesaw(i2c3, addr=0x37))
+
 except Exception as e:
-    logger.debug("Could not get SHT31-D Temp/Humidity sensor: "+str(e))
+    logger.debug("Could not get SHT31-D Temp/Humidity or soil sensors: "+str(e))
 
 # Configure InfluxDB connection variables
 host = "localhost" # My Ubuntu NUC
@@ -64,6 +72,24 @@ lastpictime = dt.datetime.now()
 picfoldername = dt.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 vpdset = 9.0 #set default value
 nightvpdset = 7.5 #set default value
+
+def getsoilmoisture(i):
+    global ss
+    try:
+        #get moisture
+        sens = ss[i].moisture_read()
+        return sens
+    except Exception as e:
+        logging.debug("Could not get temperature from Sensor "+str(i)+": "+str(e))
+
+def getsoiltemp(i):
+    global ss
+    try:
+        #read temperature from the temperature sensor
+        temp = ss[i].get_temp()
+        return temp
+    except Exception as e:
+        logging.debug("Could not get moisture reading from Sensor "+str(i)+": "+str(e))
 
 def makepicdir(folder):
     try:
